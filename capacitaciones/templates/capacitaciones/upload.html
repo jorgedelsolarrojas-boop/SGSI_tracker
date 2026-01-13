@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm mt-5">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Actualizar Base de Datos Maestra</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Sube el archivo Excel con el formato oficial de 6 charlas para actualizar el progreso de todos los colaboradores.</p>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        {{ form.as_p }}
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">Iniciar Importación</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

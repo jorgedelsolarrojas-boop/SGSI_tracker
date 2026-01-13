@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6"> <div class="card shadow mt-5">
+            <div class="card-body">
+                <h3 class="text-center mb-4">Registrar Nuevo Administrador</h3>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Usuario:</label>
+                            <input type="text" name="username" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Correo:</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nombres:</label>
+                            <input type="text" name="first_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Apellidos:</label>
+                            <input type="text" name="last_name" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">DNI:</label>
+                            <input type="text" name="dni" class="form-control" maxlength="8" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Num. Registro:</label>
+                            <input type="text" name="num_reg" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña:</label>
+                        <input type="password" name="password1" class="form-control" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Confirmar Contraseña:</label>
+                        <input type="password" name="password2" class="form-control" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Crear Cuenta Administrativa</button>
+                    <div class="text-center mt-3">
+                        <a href="{% url 'dashboard_admin' %}" class="text-muted small">Volver al Dashboard</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div id="reporte-pdf">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-7">
+            <h2 class="fw-bold text-primary">Dashboard de Cumplimiento SGSI</h2>
+            <p class="text-muted">Mostrando datos para: <strong>{{ total_empleados }}</strong> colaboradores.</p>
+        </div>
+        <div class="col-md-5 text-end d-print-none">
+            <a href="?export=pdf&intendencia={{ filtros.intendencia|default:'' }}&unidad={{ filtros.unidad|default:'' }}" 
+               class="btn btn-danger btn-lg shadow fw-bold px-4">
+                Descargar Reporte PDF con Gráficos
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4 d-print-none bg-light">
+        <div class="card-body">
+            <form method="GET" class="row g-3" id="filterForm">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary">Intendencia</label>
+                    <select name="intendencia" class="form-select border-primary" onchange="this.form.submit()">
+                        <option value="">-- Todas las Intendencias --</option>
+                        {% for int in listado_intendencias %}
+                        <option value="{{ int }}" {% if filtros.intendencia == int %}selected{% endif %}>{{ int }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-secondary">Unidad Orgánica</label>
+                    <select name="unidad" class="form-select border-primary">
+                        <option value="">-- {% if filtros.intendencia %}Unidades Filtradas{% else %}Todas las Unidades{% endif %} --</option>
+                        {% for uni in listado_unidades %}
+                        <option value="{{ uni }}" {% if filtros.unidad == uni %}selected{% endif %}>{{ uni }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">APLICAR FILTROS</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white fw-bold py-3">Progreso Comparativo: Total de Aprobados por Charla</div>
+                <div class="card-body">
+                    <canvas id="chartBarras" style="max-height: 320px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for s in stats_list %}
+        <div class="col-md-4 mb-4">
+            <div class="card shadow-sm h-100 border-0">
+                <div class="card-header text-center fw-bold bg-white border-bottom-0 pt-3">Charla {{ s.n }}</div>
+                <div class="card-body">
+                    <div style="max-height: 200px;">
+                        <canvas id="chartPie{{ s.n }}"></canvas>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <span class="badge bg-success py-2 px-3">Aprobados: {{ s.aprobados }}</span>
+                        <span class="badge bg-danger py-2 px-3">Pendientes: {{ s.pendientes }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script id="json-data" type="application/json">{% if json_stats %}{{ json_stats|safe }}{% else %}[]{% endif %}</script>
+
+<script>
+(function(){
+    // Recuperar datos
+    const jsonEl = document.getElementById('json-data');
+    let rawData = [];
+    try {
+        rawData = JSON.parse(jsonEl.textContent || '[]');
+    } catch (e) { console.error(e); }
+
+    if (!rawData.length) return; // No dibujar si no hay datos
+
+    // 1. Gráfico de Barras
+    const ctxBar = document.getElementById('chartBarras');
+    if (ctxBar) {
+        new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: rawData.map(item => `Charla ${item.n}`),
+                datasets: [{
+                    label: 'Aprobados',
+                    data: rawData.map(item => item.aprobados),
+                    backgroundColor: '#0d6efd',
+                    borderRadius: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    // 2. Gráficos de Pastel
+    rawData.forEach(s => {
+        const ctxPie = document.getElementById(`chartPie${s.n}`);
+        if (ctxPie) {
+            new Chart(ctxPie, {
+                type: 'pie',
+                data: {
+                    labels: ['Aprobados', 'Pendientes'],
+                    datasets: [{
+                        data: [s.aprobados, s.pendientes],
+                        backgroundColor: ['#198754', '#dc3545'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+                }
+            });
+        }
+    });
+})();
+</script>
+
+<style>
+    .card { transition: transform 0.2s; }
+    .card:hover { transform: translateY(-5px); }
+</style>
+{% endblock %}
