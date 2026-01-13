@@ -19,23 +19,27 @@
             <a class="navbar-brand" href="{% url 'buscar_progreso' %}">SGSI Charlas</a>
         <div class="navbar-nav ms-auto">
             {% if user.is_authenticated %}
-                <a class="btn btn-outline-info btn-sm me-2 d-inline-flex align-items-center fw-bold" href="{% url 'modulo_secreto' %}">
-                    <span class="me-1"></span> Ver Maestro
-                </a>
+            <a class="btn btn-outline-light btn-sm me-2 d-inline-flex align-items-center" href="{% url 'buscar_progreso' %}">
+                <span class="me-1"></span> Buscar
+            </a>
 
-                <a class="btn btn-outline-light btn-sm me-2 d-inline-flex align-items-center" href="{% url 'importar_excel' %}">
-                    <span class="me-1"></span> Subir Maestro
-                </a>
+            <a class="btn btn-outline-info btn-sm me-2 d-inline-flex align-items-center fw-bold" href="{% url 'modulo_secreto' %}">
+                <span class="me-1"></span> Ver Maestro
+            </a>
 
-                <a class="btn btn-light btn-sm text-primary fw-bold me-2 d-inline-flex align-items-center" href="{% url 'dashboard_admin' %}">
-                    <span class="me-1"></span> Dashboard
-                </a>
+            <a class="btn btn-outline-light btn-sm me-2 d-inline-flex align-items-center" href="{% url 'importar_excel' %}">
+                <span class="me-1"></span> Subir Maestro
+            </a>
 
-                {% if user.is_superuser %}
-                <a class="btn btn-outline-warning btn-sm me-2 d-inline-flex align-items-center fw-bold text-warning" href="{% url 'registrar_admin' %}">
-                    <span class="me-1"></span> Nuevo Admin
-                </a>
-                {% endif %}
+            <a class="btn btn-light btn-sm text-primary fw-bold me-2 d-inline-flex align-items-center" href="{% url 'dashboard_admin' %}">
+                <span class="me-1"></span> Dashboard
+            </a>
+
+            {% if user.is_superuser %}
+            <a class="btn btn-outline-warning btn-sm me-2 d-inline-flex align-items-center fw-bold text-warning" href="{% url 'registrar_admin' %}">
+                <span class="me-1"></span> Nuevo Admin
+            </a>
+            {% endif %}
 
                 <form action="{% url 'logout' %}" method="post" style="display:inline;">
                     {% csrf_token %}
