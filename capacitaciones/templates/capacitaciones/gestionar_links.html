@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+            <h4 class="mb-0 fw-bold">Configuración Dinámica de Charlas</h4>
+            <span class="badge bg-info">{{ charlas.count }} Charlas detectadas</span>
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted mb-4">
+                Aquí puedes modificar los nombres y enlaces que verán los usuarios cuando su estado sea "Pendiente". 
+                Si subes un nuevo Excel con más charlas, aparecerán aquí automáticamente.
+            </p>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 5%;">#</th>
+                                <th style="width: 25%;">Título de la Charla (Editable)</th>
+                                <th style="width: 35%;">URL Video (SharePoint/Teams)</th>
+                                <th style="width: 35%;">URL Evaluación (Microsoft Forms)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for charla in charlas %}
+                            <tr>
+                                <td class="fw-bold text-primary">{{ charla.numero }}</td>
+                                <td>
+                                    <input type="text" name="titulo_{{ charla.id }}" 
+                                           class="form-control form-control-sm" 
+                                           value="{{ charla.titulo }}" required>
+                                </td>
+                                <td>
+                                    <input type="url" name="video_{{ charla.id }}" 
+                                           class="form-control form-control-sm" 
+                                           placeholder="https://..." 
+                                           value="{{ charla.url_video|default:'' }}">
+                                </td>
+                                <td>
+                                    <input type="url" name="eval_{{ charla.id }}" 
+                                           class="form-control form-control-sm" 
+                                           placeholder="https://..." 
+                                           value="{{ charla.url_evaluacion|default:'' }}">
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-5">
+                                    No hay charlas cargadas. Sube un archivo maestro primero.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                    <a href="{% url 'dashboard_admin' %}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                    <button type="submit" class="btn btn-primary btn-lg px-5 fw-bold shadow">
+                        Guardar Cambios en la Nube
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

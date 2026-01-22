@@ -1,7 +1,7 @@
 from django.db import transaction
 import pandas as pd
 from django.shortcuts import render, redirect
-from .models import Empleado, ProgresoCharla, RegistroCarga
+from .models import CharlaMaestra, Empleado, ProgresoCharla, RegistroCarga
 from .forms import UploadExcelForm
 from django.contrib import messages
 from django.db.models import Count, Q
@@ -27,7 +27,6 @@ from django.core.paginator import Paginator
 from .forms import RegistrarAdminForm
 from .models import PerfilAdmin
 
-
 class DashboardGSIView(LoginRequiredMixin, View):
     template_name = 'capacitaciones/dashboard.html'
 
@@ -40,71 +39,67 @@ class DashboardGSIView(LoginRequiredMixin, View):
         
         if query_intendencia:
             empleados = empleados.filter(intendencia=query_intendencia)
-        
-        # Si seleccionamos unidad, filtramos también (esto es para el resultado final)
         if query_unidad:
             empleados = empleados.filter(unidad_organica=query_unidad)
         
         return empleados, query_intendencia, query_unidad
 
     def get(self, request, *args, **kwargs):
-        # 1. Lógica de Exportación PDF
+        # 1. Si la URL pide exportar, llamar a la función de PDF
         if request.GET.get('export') == 'pdf':
             return self.generar_pdf(request)
 
-        # 2. Obtener datos filtrados
+        # 2. Obtener empleados filtrados y valores de búsqueda
         empleados, q_int, q_uni = self.get_filtros(request)
+        total_poblacion = empleados.count()
         
-        # --- LÓGICA JERÁRQUICA PARA DROPDOWNS ---
-        # A. Las intendencias siempre se muestran todas para poder cambiar
+        # --- LÓGICA DE FILTROS JERÁRQUICOS ---
         listado_intendencias = Empleado.objects.values_list('intendencia', flat=True).distinct().order_by('intendencia')
         
-        # B. Las unidades dependen de si hay una intendencia seleccionada
+        # Si hay intendencia seleccionada, filtramos las unidades que le pertenecen
         if q_int:
-            # Si hay Intendencia, solo mostramos sus unidades hijas
             listado_unidades = Empleado.objects.filter(intendencia=q_int).values_list('unidad_organica', flat=True).distinct().order_by('unidad_organica')
         else:
-            # Si no hay filtro, mostramos todas (o ninguna, según prefieras. Aquí dejo todas)
-            listado_unidades = Empleado.objects.values_list('unidad_organica', flat=True).distinct().order_by('unidad_organica')
+            listado_unidades = []
 
-        # 3. Estadísticas
+        # --- ESTADÍSTICAS DINÁMICAS (Usando CharlaMaestra) ---
         stats_charlas = []
-        total_emps = empleados.count()
-        
-        for i in range(1, 7):
+        charlas_configuradas = CharlaMaestra.objects.all().order_by('numero')
+
+        for charla_m in charlas_configuradas:
             aprobados = ProgresoCharla.objects.filter(
                 empleado__in=empleados, 
-                numero_charla=i, 
+                charla_config=charla_m,
                 resultado__iexact='Aprobado'
             ).count()
+            
             stats_charlas.append({
-                'n': i,
+                'n': charla_m.numero,
+                'titulo': charla_m.titulo,
                 'aprobados': aprobados,
-                'pendientes': total_emps - aprobados
+                'pendientes': total_poblacion - aprobados
             })
 
         context = {
-            'total_empleados': total_emps,
+            'total_empleados': total_poblacion,
             'listado_intendencias': listado_intendencias,
             'listado_unidades': listado_unidades,
             'filtros': {'intendencia': q_int, 'unidad': q_uni},
-            'stats_list': stats_charlas,
-            'json_stats': json.dumps(stats_charlas)
+            'stats_list': stats_charlas, # Para los cuadros del HTML
+            'json_stats': json.dumps(stats_charlas) # Para Chart.js
         }
         return render(request, self.template_name, context)
 
     def generar_grafico_matplotlib(self, aprobados, pendientes, titulo):
+        """Genera el gráfico circular en memoria"""
         plt.figure(figsize=(3, 3))
-        try: a = float(aprobados)
-        except: a = 0.0
-        try: p = float(pendientes)
-        except: p = 0.0
-        total = a + p
-        if total == 0 or total != total:
+        total = aprobados + pendientes
+        if total == 0:
             plt.pie([1], colors=['#6c757d'])
-            plt.text(0, 0, 'Sin datos', ha='center', va='center', fontsize=9)
+            plt.text(0, 0, 'Sin datos', ha='center', va='center')
         else:
-            plt.pie([a, p], labels=['Aprob.', 'Pend.'], colors=['#28a745', '#dc3545'], autopct='%1.1f%%', startangle=140)
+            plt.pie([aprobados, pendientes], labels=['Aprob.', 'Pend.'], 
+                    colors=['#198754', '#dc3545'], autopct='%1.1f%%', startangle=140)
         plt.title(titulo, fontsize=10)
         img_buffer = io.BytesIO()
         plt.savefig(img_buffer, format='png', bbox_inches='tight')
@@ -113,97 +108,46 @@ class DashboardGSIView(LoginRequiredMixin, View):
         return img_buffer
 
     def generar_pdf(self, request):
+        """Lógica de ReportLab con tablas y gráficos"""
         empleados, q_int, q_uni = self.get_filtros(request)
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         styles = getSampleStyleSheet()
         elements = []
 
-        # 1. Cabecera Mejorada
-        elements.append(Paragraph("INFORME DE CUMPLIMIENTO SGSI", styles['Title']))
-        elements.append(Paragraph(f"Fecha de corte: {timezone.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-        elements.append(Paragraph(f"Filtros: {q_int or 'NIVEL NACIONAL'} | {q_uni or 'TODAS LAS UNIDADES'}", styles['Normal']))
+        elements.append(Paragraph("INFORME ESTATÍSTICO SGSI", styles['Title']))
+        elements.append(Paragraph(f"Filtro: {q_int or 'GENERAL'} | {q_uni or 'TODAS'}", styles['Normal']))
         elements.append(Spacer(1, 20))
 
-        # 2. Generación de Celdas (Gráfico + Tabla)
-        celdas_graficos = [] # Lista plana que luego convertiremos en matriz
-        
-        total_poblacion = empleados.count()
+        # Cuadrícula de gráficos
+        celdas = []
+        charlas_m = CharlaMaestra.objects.all().order_by('numero')
+        total_p = empleados.count()
 
-        for i in range(1, 7):
-            # Cálculos
-            aprobados = ProgresoCharla.objects.filter(
-                empleado__in=empleados, 
-                numero_charla=i, 
-                resultado__iexact='Aprobado'
-            ).count()
-            pendientes = total_poblacion - aprobados
+        for c in charlas_m:
+            aprob = ProgresoCharla.objects.filter(empleado__in=empleados, charla_config=c, resultado__iexact='Aprobado').count()
+            pend = total_p - aprob
             
-            # Evitar división por cero
-            pct_aprob = (aprobados / total_poblacion * 100) if total_poblacion > 0 else 0
-            pct_pend = (pendientes / total_poblacion * 100) if total_poblacion > 0 else 0
+            buf = self.generar_grafico_matplotlib(aprob, pend, f"Charla {c.numero}")
+            img = Image(buf, width=150, height=150)
+            celdas.append([img, Paragraph(f"<b>{c.titulo}</b><br/>Aprobados: {aprob}<br/>Pendientes: {pend}", styles['Normal'])])
 
-            # A. Generar Imagen (Chart)
-            buf = self.generar_grafico_matplotlib(aprobados, pendientes, f"Charla {i}")
-            img_flowable = Image(buf, width=140, height=140)
-
-            # B. Generar Tabla de Datos (La "tablita" debajo)
-            data_subtabla = [
-                ['Estado', 'Cant.', '%'],
-                ['Aprobados', f"{aprobados}", f"{pct_aprob:.1f}%"],
-                ['Pendientes', f"{pendientes}", f"{pct_pend:.1f}%"],
-                ['TOTAL', f"{total_poblacion}", "100%"]
-            ]
-
-            sub_tabla = Table(data_subtabla, colWidths=[60, 40, 40])
-            sub_tabla.setStyle(TableStyle([
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
-                ('FONTSIZE', (0,0), (-1,-1), 8),
-                # Cabecera gris
-                ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                # Fila Aprobados (Texto Verde)
-                ('TEXTCOLOR', (0,1), (-1,1), colors.HexColor("#198754")), 
-                # Fila Pendientes (Texto Rojo)
-                ('TEXTCOLOR', (0,2), (-1,2), colors.HexColor("#dc3545")),
-                # Fila Total (Negrita)
-                ('FONTNAME', (0,3), (-1,3), 'Helvetica-Bold'),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-            ]))
-
-            # C. Agrupar Imagen y Tabla en una lista (Flowable)
-            # Esto mete el gráfico y su tabla en la misma "caja"
-            item_celda = [img_flowable, Spacer(1, 5), sub_tabla]
-            celdas_graficos.append(item_celda)
-
-        # 3. Organizar en Cuadrícula de 2 columnas
-        # Convertimos la lista plana [1,2,3,4,5,6] en matriz [[1,2], [3,4], [5,6]]
-        tabla_estructura = []
-        for i in range(0, len(celdas_graficos), 2):
-            fila = [celdas_graficos[i]]
-            if i + 1 < len(celdas_graficos):
-                fila.append(celdas_graficos[i+1])
-            else:
-                fila.append("") # Celda vacía si es impar
-            tabla_estructura.append(fila)
-
-        # 4. Estilo de la Tabla Principal (Invisible, solo para alinear)
-        t_principal = Table(tabla_estructura, colWidths=[250, 250])
-        t_principal.setStyle(TableStyle([
-            ('VALIGN', (0,0), (-1,-1), 'TOP'), # Alinear todo arriba
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'), # Centrar contenido
-            ('BOTTOMPADDING', (0,0), (-1,-1), 20), # Espacio entre filas de gráficos
-        ]))
-
-        elements.append(t_principal)
+        # Organizar de 2 en 2
+        tabla_final = Table(celdas, colWidths=[250, 250])
+        elements.append(tabla_final)
         
         doc.build(elements)
         buffer.seek(0)
-        return FileResponse(buffer, as_attachment=True, filename=f"Reporte_SGSI_{q_int or 'General'}.pdf")
+        return FileResponse(buffer, as_attachment=True, filename="Reporte_SGSI.pdf")
+
 
 from django.db import transaction
 import pandas as pd
-from .models import Empleado, ProgresoCharla, RegistroCarga
+from .models import Empleado, ProgresoCharla, RegistroCarga, CharlaMaestra
+
+from django.db import transaction
+import pandas as pd
+from .models import Empleado, ProgresoCharla, RegistroCarga, CharlaMaestra
 
 @login_required
 def importar_excel(request):
@@ -213,96 +157,125 @@ def importar_excel(request):
             file = request.FILES['archivo']
             try:
                 with transaction.atomic():
-                    # 1. CARGA INICIAL: Leemos todo como texto (sin saltar filas aún)
-                    # header=None para que no asuma que la fila 0 son los títulos
+                    # 1. Carga inicial
                     df_raw = pd.read_excel(file, header=None, dtype=str)
 
-                    # 2. ENCONTRAR LA FILA DE CABECERA DINÁMICAMENTE
+                    # 2. Localizar la fila de encabezados (COD REG.)
                     header_idx = None
                     for i, row in df_raw.iterrows():
-                        # Buscamos en la primera columna (columna 0)
                         val = str(row[0]).strip().upper() if row[0] is not None else ""
                         if val in ["COD REG.", "REG.", "COD REG", "REG"]:
                             header_idx = i
                             break
                     
                     if header_idx is None:
-                        raise ValueError("No se encontró la cabecera 'REG.' o 'COD REG.' en el archivo.")
+                        raise ValueError("No se encontró la cabecera 'REG.' o 'COD REG.'")
 
-                    # 3. RE-PROCESAR EL DATAFRAME DESDE LA CABECERA
-                    # Tomamos los datos debajo de la fila encontrada
-                    df = df_raw.iloc[header_idx + 1:].copy()
+                    # 3. FILA DE TÍTULOS (Búsqueda inteligente hacia arriba)
+                    titles_row = None
+                    for k in range(1, 5): 
+                        if header_idx - k < 0: break
+                        candidate_row = df_raw.iloc[header_idx - k]
+                        val_check = str(candidate_row[4]).strip().upper() if len(candidate_row) > 4 else ""
+                        if "ASISTIO" in val_check or "RESULTADO" in val_check:
+                            continue
+                        titles_row = candidate_row
+                        break
                     
-                    # Limpieza de NaN para evitar errores en la DB
-                    df = df.where(pd.notnull(df), None)
+                    if titles_row is None:
+                        titles_row = df_raw.iloc[header_idx - 1]
 
-                    # 4. LIMPIEZA TOTAL Y CARGA MASIVA
+                    # 4. DATOS
+                    df_data = df_raw.iloc[header_idx + 1:].copy()
+                    df_data = df_data.where(pd.notnull(df_data), None)
+
+                    total_cols = len(df_raw.columns)
+                    num_charlas = (total_cols - 4) // 3
+
+                    # 5. LIMPIEZA Y CARGA DE EMPLEADOS
                     Empleado.objects.all().delete()
-
-                    empleados_para_crear = []
-                    # Usamos .values para iterar más rápido ya que es una carga masiva
-                    for row in df.values:
-                        cod_reg_limpio = str(row[0]).strip() if row[0] is not None else None
-                        if not cod_reg_limpio: continue # Saltar filas vacías al final del Excel
-
-                        empleados_para_crear.append(Empleado(
-                            cod_reg=cod_reg_limpio,
+                    empleados_list = []
+                    for row in df_data.values:
+                        cod = str(row[0]).strip() if row[0] else None
+                        if not cod: continue
+                        empleados_list.append(Empleado(
+                            cod_reg=cod,
                             nombre_completo=str(row[1])[:255] if row[1] else "SIN NOMBRE",
                             unidad_organica=str(row[2])[:255] if row[2] else "SIN UNIDAD",
                             intendencia=str(row[3])[:255] if row[3] else "SIN INTENDENCIA",
                         ))
+                    creados = Empleado.objects.bulk_create(empleados_list, batch_size=1000)
+
+                    # --- CORRECCIÓN AQUÍ ---
                     
-                    empleados_creados = Empleado.objects.bulk_create(empleados_para_crear, batch_size=1000)
+                    # 6. SINCRONIZACIÓN DE TÍTULOS (CharlaMaestra)
+                    
+                    # A) PODA: Borrar charlas excedentes (Ej: Si antes habia 6 y ahora 4, borramos 5 y 6)
+                    # Esto limpia el Dashboard y el Configurar Links inmediatamente.
+                    CharlaMaestra.objects.filter(numero__gt=num_charlas).delete()
 
-                    # 5. CARGA DE CHARLAS
-                    charlas_para_crear = []
-                    nombres_charlas = [
-                        "Introduccion al SGSI", "Amenazas y Casos", 
-                        "Casos Prácticos Seguridad", "Medidas Seguras", 
-                        "Riesgos y amenazas", "Amenazas y delitos informáticos"
-                    ]
+                    config_map = {}
+                    col_ptr = 4
+                    for i in range(1, num_charlas + 1):
+                        raw_name = titles_row[col_ptr]
+                        if not raw_name or pd.isna(raw_name):
+                            for offset in [1, 2]:
+                                if col_ptr + offset < total_cols:
+                                    val = titles_row[col_ptr + offset]
+                                    if val and not pd.isna(val):
+                                        raw_name = val
+                                        break
+                        
+                        titulo_final = str(raw_name).strip().replace('\n', ' ') if raw_name else f"Charla {i}"
+                        if "ASISTIO" in titulo_final.upper(): titulo_final = f"Charla {i}"
 
-                    for row, emp_obj in zip(df.values, empleados_creados):
-                        col_idx = 4
-                        for i in range(6):
-                            # Lógica de detección: "SI" -> Asistió. Vacío u otro -> Pendiente.
-                            raw_asistio = row[col_idx]
-                            asistio_bool = str(raw_asistio).strip().upper() == "SI" if raw_asistio else False
-                            
-                            res_val = str(row[col_idx + 1]).strip() if row[col_idx + 1] else ""
-                            
-                            # Procesar fecha de forma segura
-                            fec_val = None
-                            raw_fec = row[col_idx + 2]
-                            if raw_fec:
-                                try:
-                                    fec_val = pd.to_datetime(raw_fec).date()
-                                except:
-                                    fec_val = None
+                        # B) ACTUALIZAR: Mantenemos los links de las charlas que sí existen
+                        obj, _ = CharlaMaestra.objects.get_or_create(
+                            numero=i,
+                            defaults={'titulo': titulo_final}
+                        )
+                        if obj.titulo != titulo_final:
+                            obj.titulo = titulo_final
+                            obj.save()
+                        
+                        config_map[i] = obj
+                        col_ptr += 3
 
-                            charlas_para_crear.append(ProgresoCharla(
+                    # 7. CARGA DE PROGRESO
+                    progresos_list = []
+                    for row_val, emp_obj in zip(df_data.values, creados):
+                        ptr = 4
+                        for i in range(1, num_charlas + 1):
+                            asistio = str(row_val[ptr]).strip().upper() == "SI" if row_val[ptr] else False
+                            resultado = str(row_val[ptr+1]).strip() if row_val[ptr+1] else ""
+                            fecha = None
+                            try:
+                                if row_val[ptr+2]:
+                                    fecha = pd.to_datetime(row_val[ptr+2], dayfirst=True).date()
+                            except: pass
+
+                            progresos_list.append(ProgresoCharla(
                                 empleado=emp_obj,
-                                numero_charla=i + 1,
-                                titulo_charla=nombres_charlas[i],
-                                asistio=asistio_bool,
-                                resultado=res_val,
-                                fecha=fec_val
+                                charla_config=config_map[i],
+                                asistio=asistio,
+                                resultado=resultado,
+                                fecha=fecha
                             ))
-                            col_idx += 3
+                            ptr += 3
 
-                    ProgresoCharla.objects.bulk_create(charlas_para_crear, batch_size=2000)
+                    ProgresoCharla.objects.bulk_create(progresos_list, batch_size=2000)
                     RegistroCarga.objects.create()
                     
-                    messages.success(request, f"¡Actualización veloz exitosa! Se encontraron los datos en la fila {header_idx + 1} del Excel. Y con {len(empleados_creados)} empleados cargados.")
+                    messages.success(request, f"¡Sincronización completa! Se detectaron {num_charlas} charlas. Las charlas excedentes fueron eliminadas.")
 
                 return redirect('importar_excel')
-
             except Exception as e:
-                messages.error(request, f"Error al procesar: {str(e)}")
+                messages.error(request, f"Error: {str(e)}")
                 return redirect('importar_excel')
     else:
         form = UploadExcelForm()
     return render(request, 'capacitaciones/upload.html', {'form': form})
+
 
 
 def buscar_progreso(request):
@@ -408,3 +381,28 @@ def modulo_secreto(request):
     page_obj = paginator.get_page(page_number)
     
     return render(request, 'capacitaciones/secreto.html', {'page_obj': page_obj})
+
+
+
+@login_required
+def gestionar_links(request):
+    # Obtenemos todas las charlas configuradas actualmente
+    charlas = CharlaMaestra.objects.all().order_by('numero')
+    
+    if request.method == "POST":
+        for charla in charlas:
+            # Capturamos los datos del formulario usando el ID de la charla
+            nuevo_titulo = request.POST.get(f'titulo_{charla.id}')
+            nuevo_video = request.POST.get(f'video_{charla.id}')
+            nueva_eval = request.POST.get(f'eval_{charla.id}')
+            
+            # Actualizamos solo si se enviaron datos
+            charla.titulo = nuevo_titulo
+            charla.url_video = nuevo_video
+            charla.url_evaluacion = nueva_eval
+            charla.save()
+            
+        messages.success(request, "✅ Configuración de charlas actualizada correctamente.")
+        return redirect('gestionar_links')
+    
+    return render(request, 'capacitaciones/gestionar_links.html', {'charlas': charlas})

@@ -29,65 +29,76 @@
                     <p class="mb-1"><strong>Intendencia:</strong> {{ empleado.intendencia }}</p>
                     <p class="mb-0"><strong>Unidad Orgánica:</strong> {{ empleado.unidad_organica }}</p>
                 </div>
-
             </div>
 
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th style="width: 25%;">Charla</th>
+                            <th style="width: 30%;">Charla</th>
                             <th>Asistió</th>
                             <th>Resultado</th>
                             <th>Fecha</th>
-                            <th class="text-center">Links / Apoyo</th>
+                            <th class="text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for charla in empleado.charlas.all|dictsort:"numero_charla" %}
+                        {# Ordenamos por el número de configuración de la charla #}
+                        {% for charla in empleado.charlas.all|dictsort:"charla_config.numero" %}
                         <tr>
                             <td>
-                                <span class="fw-bold">CHARLA {{ charla.numero_charla }}:</span> {{ charla.titulo_charla }}
-                            </td>
-                            <td>
-                                {% if charla.asistio and charla.resultado == 'Aprobado' %}
-                                    <span class="badge bg-success">Si</span>
-                                {% else %}
-                                    <span class="badge bg-danger">Pendiente</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="fw-bold {% if charla.resultado == 'Aprobado' %}text-success{% else %}text-danger{% endif %}">
-                                    {{ charla.resultado|default:"-" }}
+                                <span class="fw-bold text-dark">
+                                    {{ charla.charla_config.numero }}. {{ charla.charla_config.titulo }}
                                 </span>
                             </td>
-                            <td class="text-muted">{{ charla.fecha|date:"d/m/Y"|default:"-" }}</td>
+                            
+                            <td>
+                                {% if charla.asistio and charla.resultado == 'Aprobado' %}
+                                    <span class="badge bg-success px-3">SÍ</span>
+                                {% else %}
+                                    <span class="badge bg-danger px-3">NO</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <span class="fw-bold {% if charla.resultado == 'Aprobado' %}text-success{% else %}text-danger{% endif %}">
+                                    {% if charla.resultado and charla.resultado != '-' %}
+                                        {{ charla.resultado }}
+                                    {% else %}
+                                        Pendiente
+                                    {% endif %}
+                                </span>
+                            </td>
+
+                            <td class="text-muted small">{{ charla.fecha|date:"d/m/Y"|default:"-" }}</td>
+                            
                             <td class="text-center">
                                 {% if charla.resultado != 'Aprobado' %}
                                     <div class="btn-group btn-group-sm">
-                                        {# Determinamos los links según el número de charla #}
-                                        {% if charla.numero_charla == 1 %}
-                                            <a href="https://sunatperu.sharepoint.com/sites/videos-sunat/_layouts/15/stream.aspx?sw=bypass&bypassReason=abandoned&id=%2Fsites%2Fvideos-sunat%2Finsi%2FStream%20Migrated%20Videos%2FIntend%2ENac%2Ede%20Siste%2Ede%20Informa%2FCharla%20Introducci%C3%B3n%20Seguridad%20a%20la%20Informaci%C3%B3n%202023-20230320_090423%2Emp4&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3D&startedResponseCatch=true&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2Eb01c3108-ccf8-4a6b-b8e7-88e3e879f007&isDarkMode=false"  target="_blank" class="btn btn-outline-primary" title="Ver Video 1">Enlace a Video</a>
-                                            <a href="https://forms.office.com/r/1jTRVuFxF3" target="_blank" class="btn btn-primary">Enlace a Evaluación</a>
-                                        {% elif charla.numero_charla == 2 %}
-                                            <a href="https://sunatperu.sharepoint.com/sites/videos-sunat/_layouts/15/viewer.aspx?sourcedoc=%7B5b4a5a67-019b-5e71-c5ab-fe24fb4facfe%7D&referrer=CommSiteSearch.Web&referrerScenario=Search-Site-All.View.65216f8d-54d2-4530-b4b3-6051e0e0b774"  target="_blank" class="btn btn-outline-primary" title="Ver Videos 2">Enlace a Video</a>
-                                            <a href="https://forms.office.com/r/ri5HVRLgz3" target="_blank" class="btn btn-primary">Enlace a Evaluación</a>
-                                        {% elif charla.numero_charla == 3 %}
-                                            <a href="https://sunatperu.sharepoint.com/:v:/r/sites/videos-sunat/insi/Stream%20Migrated%20Videos/Intend.Nac.de%20Siste.de%20Informa/Charla%20de%20Sensibilizaci%C3%B3n%20en%20Seguridad%20de%20la%20Informaci%C3%B3n-%20Aprendiendo%20de%20seguridad-20220524_065711.mp4?csf=1&web=1&e=182kza&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3D"  target="_blank" class="btn btn-outline-primary" title="Ver Video 3">Enlace a Video</a>
-                                            <a href="https://forms.office.com/r/K0thPbK4JJ" target="_blank" class="btn btn-primary">Enlace a Evaluación</a>
-                                        {% elif charla.numero_charla == 4 %}
-                                            <a href="https://sunatperu.sharepoint.com/:v:/r/sites/videos-sunat/insi/Stream%20Migrated%20Videos/Intend.Nac.de%20Siste.de%20Informa/Charla%20Sensibilizaci%C3%B3n%20de%20Seguridad%20de%20la%20Informaci%C3%B3n_%20Medidas%20Seguras%20ante%20Amenazas%20y%20Vulnerabilida-20230613_035625.mp4?csf=1&web=1&e=taR61F&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3D"  target="_blank" class="btn btn-outline-primary" title="Ver Video 4">Enlace a Video</a>
-                                            <a href="https://forms.office.com/r/Ej0Npc6zUQ" target="_blank" class="btn btn-primary">Enlace a Evaluación</a>
-                                        {% elif charla.numero_charla == 5 %}
-                                            <a href="https://sunatperu.sharepoint.com/:v:/r/sites/videos-sunat/insi/SGSI/TEMA%20N%C2%B005%20Riesgos%20y%20amenazas%20de%20seguridad%20de%20la%20informaci%C3%B3n%20(1).mp4?csf=1&web=1&e=wrFkLG&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3D"  target="_blank" class="btn btn-outline-primary" title="Ver Video 5">Enlace a Video</a>
-                                            <a href="https://forms.office.com/r/EEG0ef4FJN" target="_blank" class="btn btn-primary">Enlace a Evaluación</a>
-                                        {% elif charla.numero_charla == 6 %}
-                                            <a href="https://sunatperu.sharepoint.com/sites/videos-sunat/_layouts/15/stream.aspx?id=%2fsites%2fvideos-sunat%2finsi%2fSGSI%2fTEMA+N%C2%B006+Amenazas%2c+delitos+inform%C3%A1ticos.mp4&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3d&referrer=StreamWebApp.Web&referrerScenario=AddressBarCopied.view.36f31b31-1d95-4377-a3c6-932b4701e238&xsdata=MDV8MDJ8ZmJlcm5hcmRvQHN1bmF0LmdvYi5wZXwxNjM3YjQzODU5Njk0Nzg0YWE3YzA4ZGUyZGVkOWU0ZHw2N2E3ZGZkNWUwMmU0NWQ2OTY2ZjZiMTFjZTk5ZjNjZXwwfDB8NjM4OTk4Njk1NzQ5NzEyMTkzfFVua25vd258VFdGcGJHWnNiM2Q4ZXlKRmJYQjBlVTFoY0draU9uUnlkV1VzSWxZaU9pSXdMakF1TURBd01DSXNJbEFpT2lKWGFXNHpNaUlzSWtGT0lqb2lUV0ZwYkNJc0lsZFVJam95ZlE9PXwwfHx8&sdata=bmlneG93MzJTZnJVSTdXWWR5T05sK2MwM3M2Yk5GWHltL2ErdUE2d09uUT0%3d"  target="_blank" class="btn btn-outline-primary" title="Ver Video 6">Enlace a Charla</a>
-                                            <a href="https://forms.office.com/r/wi3CWeKb0h" target="_blank" class="btn btn-primary">Enlace a Evaluación</a>
+                                        {# Los links ahora se cargan dinámicamente desde el modelo CharlaMaestra #}
+                                        
+                                        {% if charla.charla_config.url_video %}
+                                            <a href="{{ charla.charla_config.url_video }}" target="_blank" 
+                                               class="btn btn-outline-primary" title="Ver Video">
+                                                Video
+                                            </a>
+                                        {% endif %}
+
+                                        {% if charla.charla_config.url_evaluacion %}
+                                            <a href="{{ charla.charla_config.url_evaluacion }}" target="_blank" 
+                                               class="btn btn-primary" title="Rendir Evaluación">
+                                                Evaluación
+                                            </a>
+                                        {% endif %}
+
+                                        {% if not charla.charla_config.url_video and not charla.charla_config.url_evaluacion %}
+                                            <span class="text-muted small italic">Sin enlaces asignados</span>
                                         {% endif %}
                                     </div>
                                 {% else %}
-                                    <span class="text-success small fw-bold">¡Completado!</span>
+                                    <span class="text-success fw-bold">
+                                        <i class="bi bi-check-circle-fill"></i> ¡Completado!
+                                    </span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -96,11 +107,10 @@
                 </table>
             </div>
 
-
         </div>
     </div>
 
-    <p class="text-center mt-4 fw-bold text-primary fs-4">
+    <p class="text-center mt-4 fw-bold text-primary fs-5">
         Base de datos actualizada el día:
         {% if ultima_actualizacion|date:"H:i" != "00:00" %}
             <span class="text-dark">{{ ultima_actualizacion|date:"d/m/Y H:i" }}</span>
@@ -108,11 +118,11 @@
             <span class="text-dark">{{ ultima_actualizacion|date:"j" }} de {{ ultima_actualizacion|date:"F Y" }}</span>
         {% endif %}
     </p>
+
     {% elif query %}
     <div class="alert alert-warning shadow-sm mt-4 text-center">
         No se encontró ningún registro para el código: <strong>{{ query }}</strong>
     </div>
     {% endif %}
 </div>
-
 {% endblock %}

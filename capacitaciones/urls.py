@@ -7,4 +7,5 @@ urlpatterns = [
     path('dashboard/', views.DashboardGSIView.as_view(), name='dashboard_admin'),
     path('registrar_admin/', views.registrar_admin, name='registrar_admin'),
     path('maestro-full/', views.modulo_secreto, name='modulo_secreto'),
+    path('gestionar-links/', views.gestionar_links, name='gestionar_links'),
 ]
